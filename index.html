@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NovaChem - Control Nexus</title>
+    <title>NovaLogis - Control Nexus</title>
     
     <!-- Tailwind CSS (Design) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,6 +19,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore-compat.js"></script>
+
+    <!-- Bibliotecas para PDF e Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
@@ -45,11 +50,10 @@
 </head>
 <body class="bg-[#050508] text-slate-200 antialiased selection:bg-purple-500/30">
     
-    <!-- O React vai renderizar o sistema inteiro dentro desta div -->
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useContext, createContext, useMemo } = React;
+        const { useState, useEffect, useContext, createContext } = React;
 
         // === CONFIGURAÇÃO DO SEU FIREBASE ===
         const firebaseConfig = {
@@ -61,14 +65,13 @@
             appId: "1:209968061781:web:4cd9f96cab03965f01a3dc"
         };
 
-        // Inicializando Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // === SISTEMA DE ÍCONES (Para rodar no HTML puro) ===
+        // === SISTEMA DE ÍCONES (Lucide SVG Icons) ===
         const iconPaths = {
             ShieldAlert: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v4M12 16h.01"/>,
             FlaskConical: <path d="M10 2v7.31L2 20.5V22h20v-1.5L14 9.31V2M8.5 2h7M14 9.31 20 20.5H4L10 9.31Z"/>,
@@ -88,7 +91,10 @@
             UserIcon: <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>,
             Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
             Database: <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></>,
-            Loader2: <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            Loader2: <path d="M21 12a9 9 0 1 1-6.219-8.56"/>,
+            FileText: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></>,
+            FileSpreadsheet: <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></>,
+            Truck: <><path d="M10 17h4V5H2v12h3"/><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></>
         };
 
         const Icon = ({ name, size = 18, className = "" }) => (
@@ -106,10 +112,9 @@
             const [authError, setAuthError] = useState(null);
 
             useEffect(() => {
-                // Alerta de timeout se rodar local e o banco bloquear a conexão
                 const timeout = setTimeout(() => {
                     if (isInitializing) {
-                        setAuthError("O navegador bloqueou a conexão com o banco de dados. Isso acontece por segurança quando abrimos o arquivo direto com 2 cliques (file://). Hospede o arquivo no GitHub Pages ou utilize um servidor local para o sistema funcionar!");
+                        setAuthError("O navegador bloqueou a conexão com o banco de dados (file://). Hospede no GitHub Pages.");
                         setIsInitializing(false);
                     }
                 }, 4000);
@@ -125,51 +130,33 @@
                         setIsInitializing(false);
                         clearTimeout(timeout);
                     });
-                    return () => {
-                        unsubscribe();
-                        clearTimeout(timeout);
-                    };
+                    return () => { unsubscribe(); clearTimeout(timeout); };
                 } catch (error) {
-                    setAuthError(error.message);
-                    setIsInitializing(false);
-                    clearTimeout(timeout);
+                    setAuthError(error.message); setIsInitializing(false); clearTimeout(timeout);
                 }
             }, []);
 
-            const login = async (email, password) => {
-                return auth.signInWithEmailAndPassword(email, password);
-            };
-
-            const loginWithGoogle = async () => {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                return auth.signInWithPopup(provider);
-            };
-
+            const login = async (email, password) => auth.signInWithEmailAndPassword(email, password);
+            const loginWithGoogle = async () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
             const logout = async () => auth.signOut();
 
-            // TELA DE ERRO (Quando roda via C:/Users... bloqueado)
             if (authError) {
                 return (
                     <div className="min-h-screen bg-[#050508] flex items-center justify-center p-4">
                         <div className="bg-[#0f1016]/80 border border-rose-500/30 p-8 rounded-2xl max-w-lg text-center shadow-[0_0_30px_rgba(244,63,94,0.15)] relative overflow-hidden">
-                            <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-rose-900/10 blur-[150px] pointer-events-none"></div>
                             <Icon name="AlertTriangle" size={48} className="text-rose-500 mx-auto mb-4 relative z-10" />
-                            <h2 className="text-xl font-bold text-white mb-3 relative z-10">Bloqueio de Segurança do Navegador</h2>
-                            <p className="text-slate-400 text-sm mb-6 relative z-10 leading-relaxed">{authError}</p>
-                            <p className="text-purple-400 text-sm font-bold relative z-10">Não se preocupe! Siga o Passo 2 e suba o arquivo no GitHub Pages.</p>
+                            <h2 className="text-xl font-bold text-white mb-3 relative z-10">Aviso de Segurança do Navegador</h2>
+                            <p className="text-slate-400 text-sm mb-6 relative z-10">{authError}</p>
                         </div>
                     </div>
                 );
             }
 
-            // TELA DE CARREGAMENTO (Em vez de tela preta)
             if (isInitializing) {
                 return (
                     <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-center relative overflow-hidden">
-                        <div className="absolute w-[60vw] h-[60vw] rounded-full bg-purple-900/20 blur-[150px] pointer-events-none"></div>
-                        <Icon name="Loader2" size={48} className="text-purple-500 animate-spin mb-6 relative z-10" />
-                        <h1 className="text-2xl font-black text-white tracking-tighter uppercase relative z-10 animate-pulse">Iniciando NovaChem...</h1>
-                        <p className="text-slate-500 text-sm mt-2 relative z-10">Conectando aos servidores seguros do Firebase</p>
+                        <Icon name="Loader2" size={48} className="text-cyan-500 animate-spin mb-6 relative z-10" />
+                        <h1 className="text-2xl font-black text-white tracking-tighter uppercase relative z-10 animate-pulse">Iniciando NovaLogis...</h1>
                     </div>
                 );
             }
@@ -196,7 +183,9 @@
             const variants = {
                 primary: "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]",
                 secondary: "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700",
-                cyan: "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_15px_rgba(8,145,178,0.4)]"
+                cyan: "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_15px_rgba(8,145,178,0.4)]",
+                red: "bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.4)]",
+                green: "bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]"
             };
             return (
                 <button type={type} onClick={onClick} disabled={isLoading} className={`flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all ${variants[variant]} ${className}`}>
@@ -227,36 +216,27 @@
             const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
             const handleLogin = async (e) => {
-                e.preventDefault();
-                setIsLoading(true); setError('');
-                try {
-                    await login(email, password);
-                } catch (err) {
-                    setError('Acesso negado. Verifique email e senha.');
-                } finally {
-                    setIsLoading(false);
-                }
+                e.preventDefault(); setIsLoading(true); setError('');
+                try { await login(email, password); } 
+                catch (err) { setError('Acesso negado. Verifique email e senha.'); } 
+                finally { setIsLoading(false); }
             };
 
             const handleGoogleLogin = async () => {
                 setIsGoogleLoading(true); setError('');
-                try {
-                    await loginWithGoogle();
-                } catch (err) {
-                    setError('Erro no login com Google. Tem certeza que ativou no Firebase Console?');
-                } finally {
-                    setIsGoogleLoading(false);
-                }
+                try { await loginWithGoogle(); } 
+                catch (err) { setError('Erro no login com Google. Verifique o console do Firebase.'); } 
+                finally { setIsGoogleLoading(false); }
             };
 
             return (
                 <div className="min-h-screen bg-[#050508] flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute w-[60vw] h-[60vw] rounded-full bg-purple-900/20 blur-[150px] pointer-events-none"></div>
-                    <Card className="w-full max-w-md p-8 relative z-10" glowColor="purple">
+                    <div className="absolute w-[60vw] h-[60vw] rounded-full bg-cyan-900/20 blur-[150px] pointer-events-none"></div>
+                    <Card className="w-full max-w-md p-8 relative z-10" glowColor="cyan">
                         <div className="text-center mb-8">
-                            <Icon name="FlaskConical" size={48} className="text-purple-500 mx-auto mb-4" />
-                            <h1 className="text-3xl font-black text-white tracking-tighter uppercase">NovaChem</h1>
-                            <p className="text-slate-400 text-sm tracking-widest mt-1">SISTEMA RESTRITO</p>
+                            <Icon name="Truck" size={48} className="text-cyan-500 mx-auto mb-4" />
+                            <h1 className="text-3xl font-black text-white tracking-tighter uppercase">NovaLogis</h1>
+                            <p className="text-slate-400 text-sm tracking-widest mt-1">LOGÍSTICA E CONTROLE</p>
                         </div>
                         {error && <div className="bg-rose-500/10 text-rose-400 border border-rose-500/50 p-3 rounded-lg text-sm mb-6 flex items-center"><Icon name="AlertTriangle" size={16} className="mr-2"/>{error}</div>}
                         
@@ -265,17 +245,17 @@
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Email</label>
                                 <div className="relative">
                                     <Icon name="UserIcon" size={18} className="absolute left-3 top-3 text-slate-500" />
-                                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-purple-500 text-white" required />
+                                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Senha</label>
                                 <div className="relative">
                                     <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
-                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-purple-500 text-white" required />
+                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required />
                                 </div>
                             </div>
-                            <Button type="submit" className="w-full py-3" isLoading={isLoading}>ENTRAR NO SISTEMA</Button>
+                            <Button variant="cyan" type="submit" className="w-full py-3" isLoading={isLoading}>ENTRAR NO SISTEMA</Button>
                         </form>
 
                         <div className="mt-6 flex items-center justify-between">
@@ -284,13 +264,7 @@
                             <span className="w-1/4 border-b border-white/10"></span>
                         </div>
 
-                        <Button 
-                            type="button" 
-                            variant="secondary" 
-                            className="w-full mt-6 py-3 border-white/10 hover:border-white/20 hover:bg-white/5 flex items-center justify-center gap-3 transition-all" 
-                            onClick={handleGoogleLogin} 
-                            isLoading={isGoogleLoading}
-                        >
+                        <Button type="button" variant="secondary" className="w-full mt-6 py-3 border-white/10 hover:border-white/20 hover:bg-white/5 flex items-center justify-center gap-3 transition-all" onClick={handleGoogleLogin} isLoading={isGoogleLoading}>
                             {!isGoogleLoading && (
                                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -311,46 +285,94 @@
             const { logout, user } = useContext(AuthContext);
             const [view, setView] = useState('dashboard');
             
-            // Estados do Banco de Dados
             const [licenses, setLicenses] = useState([]);
             const [movements, setMovements] = useState([]);
-            const [isLoadingData, setIsLoadingData] = useState(true);
 
-            // Modal Estados
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [modalType, setModalType] = useState('');
             const [formData, setFormData] = useState({});
             const [isSaving, setIsSaving] = useState(false);
 
-            // Carregar dados do Firebase Firestore
             useEffect(() => {
-                const unsubLic = db.collection("licenses").onSnapshot(snap => {
-                    setLicenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                }, err => console.log("Erro de permissão nas Licenças", err));
-
-                const unsubMov = db.collection("movements").orderBy("date", "desc").onSnapshot(snap => {
-                    setMovements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                    setIsLoadingData(false);
-                }, err => { console.log("Erro Movimentações", err); setIsLoadingData(false); });
-
+                const unsubLic = db.collection("licenses").onSnapshot(snap => setLicenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
+                const unsubMov = db.collection("movements").orderBy("date", "desc").onSnapshot(snap => setMovements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
                 return () => { unsubLic(); unsubMov(); };
             }, []);
 
-            // Salvar no Banco
+            const processedLicenses = licenses.map(lic => {
+                if(!lic.expireDate) return { ...lic, diasRestantes: 0, badgeType: 'default', statusTxt: 'N/A' };
+                const diff = Math.ceil((new Date(lic.expireDate) - new Date()) / (1000 * 60 * 60 * 24));
+                let badgeType = 'success', statusTxt = 'Regular';
+                if (diff < 0) { badgeType = 'danger'; statusTxt = 'Vencida'; }
+                else if (diff <= lic.alertDays) { badgeType = 'warning'; statusTxt = 'Vencendo'; }
+                return { ...lic, diasRestantes: diff, badgeType, statusTxt };
+            });
+
+            // LOGIC: EXPORTAR PARA PDF
+            const handleExportPDF = (type) => {
+                const doc = new window.jspdf.jsPDF();
+                
+                if (type === 'licenses') {
+                    doc.text("NovaLogis - Relatório de Licenças", 14, 15);
+                    const columns = ["Documento", "Órgão", "Vencimento", "Status", "Dias Restantes"];
+                    const data = processedLicenses.map(lic => [
+                        lic.name, lic.agency, 
+                        lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A', 
+                        lic.statusTxt, lic.diasRestantes.toString()
+                    ]);
+                    doc.autoTable({ head: [columns], body: data, startY: 20, theme: 'grid' });
+                    doc.save("NovaLogis_Licencas.pdf");
+                } else {
+                    doc.text("NovaLogis - Relatório de Movimentações Logísticas", 14, 15);
+                    const columns = ["Ação", "Cliente", "Item/Tipo", "Quantidade", "Data"];
+                    const data = movements.map(mov => [
+                        mov.action, mov.client, mov.type, mov.quantity.toString(), 
+                        new Date(mov.date).toLocaleDateString('pt-BR')
+                    ]);
+                    doc.autoTable({ head: [columns], body: data, startY: 20, theme: 'grid' });
+                    doc.save("NovaLogis_Logistica.pdf");
+                }
+            };
+
+            // LOGIC: EXPORTAR PARA EXCEL
+            const handleExportExcel = (type) => {
+                let data = [];
+                let fileName = "";
+
+                if (type === 'licenses') {
+                    fileName = "NovaLogis_Licencas.xlsx";
+                    data = processedLicenses.map(lic => ({
+                        "Documento": lic.name,
+                        "Número": lic.number,
+                        "Órgão": lic.agency,
+                        "Vencimento": lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A',
+                        "Status": lic.statusTxt,
+                        "Dias Restantes": lic.diasRestantes
+                    }));
+                } else {
+                    fileName = "NovaLogis_Logistica.xlsx";
+                    data = movements.map(mov => ({
+                        "Ação": mov.action,
+                        "Cliente": mov.client,
+                        "Tipo do Item": mov.type,
+                        "Quantidade": mov.quantity,
+                        "Data": new Date(mov.date).toLocaleDateString('pt-BR')
+                    }));
+                }
+
+                const ws = window.XLSX.utils.json_to_sheet(data);
+                const wb = window.XLSX.utils.book_new();
+                window.XLSX.utils.book_append_sheet(wb, ws, "Relatorio_NovaLogis");
+                window.XLSX.writeFile(wb, fileName);
+            };
+
             const handleSave = async () => {
                 setIsSaving(true);
                 try {
                     if (modalType === 'license') {
-                        await db.collection("licenses").add({
-                            ...formData,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        await db.collection("licenses").add({ ...formData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     } else {
-                        await db.collection("movements").add({
-                            ...formData,
-                            date: new Date().toISOString(),
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        await db.collection("movements").add({ ...formData, date: new Date().toISOString(), createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     }
                     setIsModalOpen(false);
                 } catch (e) {
@@ -369,30 +391,18 @@
                 setIsModalOpen(true);
             };
 
-            // Inteligência das Licenças
-            const processedLicenses = licenses.map(lic => {
-                if(!lic.expireDate) return { ...lic, diasRestantes: 0, badgeType: 'default', statusTxt: 'N/A' };
-                const diff = Math.ceil((new Date(lic.expireDate) - new Date()) / (1000 * 60 * 60 * 24));
-                let badgeType = 'success', statusTxt = 'Regular';
-                if (diff < 0) { badgeType = 'danger'; statusTxt = 'Vencida'; }
-                else if (diff <= lic.alertDays) { badgeType = 'warning'; statusTxt = 'Vencendo'; }
-                return { ...lic, diasRestantes: diff, badgeType, statusTxt };
-            });
-
             return (
                 <div className="flex h-screen overflow-hidden">
-                    {/* Fundo Glow */}
                     <div className="fixed inset-0 pointer-events-none z-0">
                         <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-900/10 blur-[150px]"></div>
                         <div className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-cyan-900/10 blur-[150px]"></div>
                     </div>
 
-                    {/* Sidebar */}
                     <aside className="w-64 bg-[#0a0b10] border-r border-white/5 flex flex-col z-10 shadow-2xl">
                         <div className="p-6">
                             <div className="flex items-center gap-3 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
-                                <Icon name="FlaskConical" size={28} className="text-purple-500" />
-                                <h1 className="text-2xl font-black tracking-tighter uppercase">NovaChem</h1>
+                                <Icon name="Truck" size={28} className="text-cyan-500" />
+                                <h1 className="text-2xl font-black tracking-tighter uppercase">NovaLogis</h1>
                             </div>
                         </div>
                         <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -405,7 +415,6 @@
                         </div>
                     </aside>
 
-                    {/* Conteúdo Central */}
                     <main className="flex-1 flex flex-col z-10">
                         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-[#0a0b10]/60 backdrop-blur-xl">
                             <h2 className="text-xl font-bold uppercase tracking-wide text-slate-300">
@@ -414,14 +423,13 @@
                             <div className="flex items-center gap-4">
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-white">{user?.displayName || user?.email || 'Usuário'}</p>
-                                    <p className="text-[10px] text-emerald-400 uppercase flex items-center justify-end gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online no Firebase</p>
+                                    <p className="text-[10px] text-emerald-400 uppercase flex items-center justify-end gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online</p>
                                 </div>
                             </div>
                         </header>
 
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                             
-                            {/* DASHBOARD */}
                             {view === 'dashboard' && (
                                 <div className="grid grid-cols-2 gap-6 max-w-4xl mx-auto mt-10">
                                     <Card className="p-8 text-center" glowColor="purple">
@@ -432,15 +440,18 @@
                                     <Card className="p-8 text-center" glowColor="cyan">
                                         <Icon name="ArrowRightLeft" size={40} className="mx-auto text-cyan-500 mb-4" />
                                         <h3 className="text-5xl font-black text-white mb-2">{movements.length}</h3>
-                                        <p className="text-slate-400">Movimentações Registradas</p>
+                                        <p className="text-slate-400">Movimentações Logísticas</p>
                                     </Card>
                                 </div>
                             )}
 
-                            {/* LICENÇAS */}
                             {view === 'licenses' && (
                                 <div>
-                                    <div className="flex justify-end mb-6">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div className="flex gap-3">
+                                            <Button variant="red" onClick={() => handleExportPDF('licenses')}><Icon name="FileText" className="mr-2"/> Baixar PDF</Button>
+                                            <Button variant="green" onClick={() => handleExportExcel('licenses')}><Icon name="FileSpreadsheet" className="mr-2"/> Baixar EXCEL</Button>
+                                        </div>
                                         <Button onClick={()=>openModal('license')}><Icon name="Plus" className="mr-2"/> Nova Licença</Button>
                                     </div>
                                     <Card className="p-0 overflow-hidden">
@@ -464,11 +475,14 @@
                                 </div>
                             )}
 
-                            {/* VASILHAMES */}
                             {view === 'containers' && (
                                 <div>
-                                    <div className="flex justify-end mb-6">
-                                        <Button variant="cyan" onClick={()=>openModal('movement')}><Icon name="ArrowRightLeft" className="mr-2"/> Registrar Movimentação</Button>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <div className="flex gap-3">
+                                            <Button variant="red" onClick={() => handleExportPDF('containers')}><Icon name="FileText" className="mr-2"/> Baixar PDF</Button>
+                                            <Button variant="green" onClick={() => handleExportExcel('containers')}><Icon name="FileSpreadsheet" className="mr-2"/> Baixar EXCEL</Button>
+                                        </div>
+                                        <Button variant="cyan" onClick={()=>openModal('movement')}><Icon name="ArrowRightLeft" className="mr-2"/> Lançar Movimentação</Button>
                                     </div>
                                     <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-white/10">
                                         {movements.map(mov => (
@@ -498,14 +512,14 @@
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <Card className="w-full max-w-md p-6">
                                 <h3 className="text-xl font-bold text-white mb-6">
-                                    {modalType === 'license' ? 'Cadastrar Licença' : 'Registrar Movimentação'}
+                                    {modalType === 'license' ? 'Cadastrar Licença' : 'Registrar Movimentação Logística'}
                                 </h3>
                                 
                                 {modalType === 'license' ? (
                                     <div className="space-y-4">
                                         <input type="text" placeholder="Nome do Documento" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
                                         <input type="text" placeholder="Número da Licença" value={formData.number} onChange={e=>setFormData({...formData, number:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
-                                        <input type="text" placeholder="Órgão Fiscalizador (Ex: PF)" value={formData.agency} onChange={e=>setFormData({...formData, agency:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
+                                        <input type="text" placeholder="Órgão Fiscalizador" value={formData.agency} onChange={e=>setFormData({...formData, agency:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
                                         <div>
                                             <label className="text-xs text-slate-400 mb-1 block">Data de Vencimento</label>
                                             <input type="date" value={formData.expireDate} onChange={e=>setFormData({...formData, expireDate:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
@@ -514,13 +528,13 @@
                                 ) : (
                                     <div className="space-y-4">
                                         <select value={formData.action} onChange={e=>setFormData({...formData, action:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none">
-                                            <option value="SAIDA">Saída de Vasilhame</option>
-                                            <option value="RETORNO">Retorno de Vasilhame</option>
+                                            <option value="SAIDA">Saída de Item</option>
+                                            <option value="RETORNO">Retorno de Item</option>
                                             <option value="PERDA">Perda / Dano</option>
                                         </select>
-                                        <input type="text" placeholder="Nome do Cliente" value={formData.client} onChange={e=>setFormData({...formData, client:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+                                        <input type="text" placeholder="Nome do Cliente/Destino" value={formData.client} onChange={e=>setFormData({...formData, client:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
                                         <div className="flex gap-4">
-                                            <input type="text" placeholder="Tipo Frasco (Ex: IBC 1000L)" value={formData.type} onChange={e=>setFormData({...formData, type:e.target.value})} className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+                                            <input type="text" placeholder="Tipo (Ex: Palete, Container)" value={formData.type} onChange={e=>setFormData({...formData, type:e.target.value})} className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
                                             <input type="number" placeholder="Qtd" value={formData.quantity} onChange={e=>setFormData({...formData, quantity:Number(e.target.value)})} className="w-24 bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
                                         </div>
                                     </div>
