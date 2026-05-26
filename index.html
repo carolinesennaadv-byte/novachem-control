@@ -137,6 +137,7 @@
             }, []);
 
             const login = async (email, password) => auth.signInWithEmailAndPassword(email, password);
+            const register = async (email, password) => auth.createUserWithEmailAndPassword(email, password);
             const loginWithGoogle = async () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
             const logout = async () => auth.signOut();
 
@@ -162,7 +163,7 @@
             }
 
             return (
-                <AuthContext.Provider value={{ user, uiLoggedIn: !!user, login, loginWithGoogle, logout, isInitializing }}>
+                <AuthContext.Provider value={{ user, uiLoggedIn: !!user, login, register, loginWithGoogle, logout, isInitializing }}>
                     {children}
                 </AuthContext.Provider>
             );
@@ -208,17 +209,34 @@
 
         // === TELA DE LOGIN ===
         const LoginScreen = () => {
-            const { login, loginWithGoogle } = useContext(AuthContext);
+            const { login, register, loginWithGoogle } = useContext(AuthContext);
+            const [isRegistering, setIsRegistering] = useState(false);
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
+            const [confirmPassword, setConfirmPassword] = useState('');
             const [error, setError] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-            const handleLogin = async (e) => {
+            const handleAuth = async (e) => {
                 e.preventDefault(); setIsLoading(true); setError('');
-                try { await login(email, password); } 
-                catch (err) { setError('Acesso negado. Verifique email e senha.'); } 
+                try { 
+                    if (isRegistering) {
+                        if (password !== confirmPassword) {
+                            setError('As senhas não coincidem.');
+                            setIsLoading(false);
+                            return;
+                        }
+                        await register(email, password);
+                    } else {
+                        await login(email, password); 
+                    }
+                } 
+                catch (err) { 
+                    if (err.code === 'auth/email-already-in-use') setError('Este email já está cadastrado.');
+                    else if (err.code === 'auth/weak-password') setError('A senha deve ter pelo menos 6 caracteres.');
+                    else setError(isRegistering ? 'Erro ao criar conta. Verifique seus dados.' : 'Acesso negado. Verifique email e senha.'); 
+                } 
                 finally { setIsLoading(false); }
             };
 
@@ -236,11 +254,11 @@
                         <div className="text-center mb-8">
                             <Icon name="Truck" size={48} className="text-cyan-500 mx-auto mb-4" />
                             <h1 className="text-3xl font-black text-white tracking-tighter uppercase">NovaLogis</h1>
-                            <p className="text-slate-400 text-sm tracking-widest mt-1">LOGÍSTICA E CONTROLE</p>
+                            <p className="text-slate-400 text-sm tracking-widest mt-1">{isRegistering ? 'CRIAR NOVA CONTA' : 'LOGÍSTICA E CONTROLE'}</p>
                         </div>
                         {error && <div className="bg-rose-500/10 text-rose-400 border border-rose-500/50 p-3 rounded-lg text-sm mb-6 flex items-center"><Icon name="AlertTriangle" size={16} className="mr-2"/>{error}</div>}
                         
-                        <form onSubmit={handleLogin} className="space-y-5">
+                        <form onSubmit={handleAuth} className="space-y-5">
                             <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Email</label>
                                 <div className="relative">
@@ -252,11 +270,38 @@
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Senha</label>
                                 <div className="relative">
                                     <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
-                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required />
+                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required minLength="6" />
                                 </div>
                             </div>
-                            <Button variant="cyan" type="submit" className="w-full py-3" isLoading={isLoading}>ENTRAR NO SISTEMA</Button>
+                            
+                            {isRegistering && (
+                                <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Confirmar Senha</label>
+                                    <div className="relative">
+                                        <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
+                                        <input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required minLength="6" />
+                                    </div>
+                                </div>
+                            )}
+
+                            <Button variant="cyan" type="submit" className="w-full py-3 mt-2" isLoading={isLoading}>
+                                {isRegistering ? 'CRIAR CONTA SEGURA' : 'ENTRAR NO SISTEMA'}
+                            </Button>
                         </form>
+
+                        <div className="mt-4 text-center">
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    setIsRegistering(!isRegistering);
+                                    setError('');
+                                    setConfirmPassword('');
+                                }} 
+                                className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors"
+                            >
+                                {isRegistering ? 'Já tenho uma conta. Fazer Login' : 'Não tem conta? Criar agora'}
+                            </button>
+                        </div>
 
                         <div className="mt-6 flex items-center justify-between">
                             <span className="w-1/4 border-b border-white/10"></span>
