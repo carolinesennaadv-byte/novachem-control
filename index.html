@@ -233,9 +233,11 @@
                     }
                 } 
                 catch (err) { 
+                    console.error("Detalhe do Erro Auth:", err); // Para debug na consola do navegador
                     if (err.code === 'auth/email-already-in-use') setError('Este email já está cadastrado.');
                     else if (err.code === 'auth/weak-password') setError('A senha deve ter pelo menos 6 caracteres.');
-                    else setError(isRegistering ? 'Erro ao criar conta. Verifique seus dados.' : 'Acesso negado. Verifique email e senha.'); 
+                    else if (err.code === 'auth/operation-not-allowed') setError('O registo por Email e Palavra-passe não está ativado no seu Firebase Console.');
+                    else setError(isRegistering ? `Erro ao criar conta: ${err.message}` : `Acesso negado: ${err.message}`); 
                 } 
                 finally { setIsLoading(false); }
             };
