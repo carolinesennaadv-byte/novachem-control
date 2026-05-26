@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaChem - Control Nexus</title>
+    
+    <!-- Tailwind CSS (Design) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM (Lógica) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel (Para o navegador entender o código React JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Firebase (Banco de Dados - Versão Compatível com HTML puro) -->
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.2); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.5); }
+    </style>
+
+    <!-- Tratamento de Erro Global de Script -->
+    <script>
+        window.addEventListener('error', function(event) {
+            if(document.getElementById('root').innerHTML === '') {
+                document.getElementById('root').innerHTML = `
+                    <div style="background-color: #050508; color: #f43f5e; padding: 40px; font-family: sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center;">
+                        <div>
+                            <h2 style="font-size: 24px; margin-bottom: 10px;">Erro de Execução Encontrado</h2>
+                            <p>${event.message}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</head>
+<body class="bg-[#050508] text-slate-200 antialiased selection:bg-purple-500/30">
+    
+    <!-- O React vai renderizar o sistema inteiro dentro desta div -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useContext, createContext, useMemo } = React;
+
+        // === CONFIGURAÇÃO DO SEU FIREBASE ===
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfL15pq1lSAdAGPUKMZAw7x90COkCHVfY",
+            authDomain: "novachem-95766.firebaseapp.com",
+            projectId: "novachem-95766",
+            storageBucket: "novachem-95766.firebasestorage.app",
+            messagingSenderId: "209968061781",
+            appId: "1:209968061781:web:4cd9f96cab03965f01a3dc"
+        };
+
+        // Inicializando Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // === SISTEMA DE ÍCONES (Para rodar no HTML puro) ===
+        const iconPaths = {
+            ShieldAlert: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v4M12 16h.01"/>,
+            FlaskConical: <path d="M10 2v7.31L2 20.5V22h20v-1.5L14 9.31V2M8.5 2h7M14 9.31 20 20.5H4L10 9.31Z"/>,
+            LayoutDashboard: <><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>,
+            Settings: <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>,
+            LogOut: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>,
+            Plus: <path d="M5 12h14M12 5v14"/>,
+            Search: <><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>,
+            Bell: <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/>,
+            Users: <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M12 7a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>,
+            CheckCircle2: <><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></>,
+            Clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+            AlertTriangle: <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01"/>,
+            Activity: <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>,
+            ArrowRightLeft: <path d="m16 3 4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/>,
+            ChevronRight: <path d="m9 18 6-6-6-6"/>,
+            UserIcon: <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>,
+            Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+            Database: <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></>,
+            Loader2: <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        };
+
+        const Icon = ({ name, size = 18, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {iconPaths[name]}
+            </svg>
+        );
+
+        // === CONTEXTO DE AUTENTICAÇÃO ===
+        const AuthContext = createContext({});
+
+        const AuthProvider = ({ children }) => {
+            const [user, setUser] = useState(null);
+            const [isInitializing, setIsInitializing] = useState(true);
+            const [authError, setAuthError] = useState(null);
+
+            useEffect(() => {
+                // Alerta de timeout se rodar local e o banco bloquear a conexão
+                const timeout = setTimeout(() => {
+                    if (isInitializing) {
+                        setAuthError("O navegador bloqueou a conexão com o banco de dados. Isso acontece por segurança quando abrimos o arquivo direto com 2 cliques (file://). Hospede o arquivo no GitHub Pages ou utilize um servidor local para o sistema funcionar!");
+                        setIsInitializing(false);
+                    }
+                }, 4000);
+
+                try {
+                    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+                        setUser(currentUser);
+                        setIsInitializing(false);
+                        clearTimeout(timeout);
+                    }, (error) => {
+                        console.error("Erro Firebase:", error);
+                        setAuthError(error.message);
+                        setIsInitializing(false);
+                        clearTimeout(timeout);
+                    });
+                    return () => {
+                        unsubscribe();
+                        clearTimeout(timeout);
+                    };
+                } catch (error) {
+                    setAuthError(error.message);
+                    setIsInitializing(false);
+                    clearTimeout(timeout);
+                }
+            }, []);
+
+            const login = async (email, password) => {
+                return auth.signInWithEmailAndPassword(email, password);
+            };
+
+            const loginWithGoogle = async () => {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                return auth.signInWithPopup(provider);
+            };
+
+            const logout = async () => auth.signOut();
+
+            // TELA DE ERRO (Quando roda via C:/Users... bloqueado)
+            if (authError) {
+                return (
+                    <div className="min-h-screen bg-[#050508] flex items-center justify-center p-4">
+                        <div className="bg-[#0f1016]/80 border border-rose-500/30 p-8 rounded-2xl max-w-lg text-center shadow-[0_0_30px_rgba(244,63,94,0.15)] relative overflow-hidden">
+                            <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-rose-900/10 blur-[150px] pointer-events-none"></div>
+                            <Icon name="AlertTriangle" size={48} className="text-rose-500 mx-auto mb-4 relative z-10" />
+                            <h2 className="text-xl font-bold text-white mb-3 relative z-10">Bloqueio de Segurança do Navegador</h2>
+                            <p className="text-slate-400 text-sm mb-6 relative z-10 leading-relaxed">{authError}</p>
+                            <p className="text-purple-400 text-sm font-bold relative z-10">Não se preocupe! Siga o Passo 2 e suba o arquivo no GitHub Pages.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            // TELA DE CARREGAMENTO (Em vez de tela preta)
+            if (isInitializing) {
+                return (
+                    <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-center relative overflow-hidden">
+                        <div className="absolute w-[60vw] h-[60vw] rounded-full bg-purple-900/20 blur-[150px] pointer-events-none"></div>
+                        <Icon name="Loader2" size={48} className="text-purple-500 animate-spin mb-6 relative z-10" />
+                        <h1 className="text-2xl font-black text-white tracking-tighter uppercase relative z-10 animate-pulse">Iniciando NovaChem...</h1>
+                        <p className="text-slate-500 text-sm mt-2 relative z-10">Conectando aos servidores seguros do Firebase</p>
+                    </div>
+                );
+            }
+
+            return (
+                <AuthContext.Provider value={{ user, uiLoggedIn: !!user, login, loginWithGoogle, logout, isInitializing }}>
+                    {children}
+                </AuthContext.Provider>
+            );
+        };
+
+        // === COMPONENTES VISUAIS ===
+        const Card = ({ children, className = '', glowColor = 'none' }) => {
+            const glows = {
+                none: 'border-white/5',
+                purple: 'border-purple-500/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.15)] hover:border-purple-500/50',
+                cyan: 'border-cyan-500/30 hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] hover:border-cyan-500/50',
+                rose: 'border-rose-500/30 hover:shadow-[0_0_20px_rgba(244,63,94,0.15)] hover:border-rose-500/50',
+            };
+            return <div className={`bg-[#0f1016]/80 backdrop-blur-xl border rounded-2xl transition-all duration-300 ${glows[glowColor]} ${className}`}>{children}</div>;
+        };
+
+        const Button = ({ children, variant = 'primary', isLoading, onClick, className = '', type = 'button' }) => {
+            const variants = {
+                primary: "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.4)]",
+                secondary: "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700",
+                cyan: "bg-cyan-600 hover:bg-cyan-500 text-white shadow-[0_0_15px_rgba(8,145,178,0.4)]"
+            };
+            return (
+                <button type={type} onClick={onClick} disabled={isLoading} className={`flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all ${variants[variant]} ${className}`}>
+                    {isLoading ? <Icon name="Loader2" size={18} className="animate-spin mr-2" /> : null}
+                    {children}
+                </button>
+            );
+        };
+
+        const NeonBadge = ({ text, type = 'default' }) => {
+            const styles = {
+                danger: 'bg-rose-500/10 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.3)]',
+                warning: 'bg-amber-500/10 text-amber-400 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)]',
+                success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]',
+                cyan: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]',
+                default: 'bg-purple-500/10 text-purple-400 border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.3)]',
+            };
+            return <span className={`flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${styles[type]}`}>{text}</span>;
+        };
+
+        // === TELA DE LOGIN ===
+        const LoginScreen = () => {
+            const { login, loginWithGoogle } = useContext(AuthContext);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setIsLoading(true); setError('');
+                try {
+                    await login(email, password);
+                } catch (err) {
+                    setError('Acesso negado. Verifique email e senha.');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleGoogleLogin = async () => {
+                setIsGoogleLoading(true); setError('');
+                try {
+                    await loginWithGoogle();
+                } catch (err) {
+                    setError('Erro no login com Google. Tem certeza que ativou no Firebase Console?');
+                } finally {
+                    setIsGoogleLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-[#050508] flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute w-[60vw] h-[60vw] rounded-full bg-purple-900/20 blur-[150px] pointer-events-none"></div>
+                    <Card className="w-full max-w-md p-8 relative z-10" glowColor="purple">
+                        <div className="text-center mb-8">
+                            <Icon name="FlaskConical" size={48} className="text-purple-500 mx-auto mb-4" />
+                            <h1 className="text-3xl font-black text-white tracking-tighter uppercase">NovaChem</h1>
+                            <p className="text-slate-400 text-sm tracking-widest mt-1">SISTEMA RESTRITO</p>
+                        </div>
+                        {error && <div className="bg-rose-500/10 text-rose-400 border border-rose-500/50 p-3 rounded-lg text-sm mb-6 flex items-center"><Icon name="AlertTriangle" size={16} className="mr-2"/>{error}</div>}
+                        
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Email</label>
+                                <div className="relative">
+                                    <Icon name="UserIcon" size={18} className="absolute left-3 top-3 text-slate-500" />
+                                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-purple-500 text-white" required />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Senha</label>
+                                <div className="relative">
+                                    <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
+                                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-purple-500 text-white" required />
+                                </div>
+                            </div>
+                            <Button type="submit" className="w-full py-3" isLoading={isLoading}>ENTRAR NO SISTEMA</Button>
+                        </form>
+
+                        <div className="mt-6 flex items-center justify-between">
+                            <span className="w-1/4 border-b border-white/10"></span>
+                            <span className="text-xs text-slate-500 uppercase font-medium">ou conecte-se com</span>
+                            <span className="w-1/4 border-b border-white/10"></span>
+                        </div>
+
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            className="w-full mt-6 py-3 border-white/10 hover:border-white/20 hover:bg-white/5 flex items-center justify-center gap-3 transition-all" 
+                            onClick={handleGoogleLogin} 
+                            isLoading={isGoogleLoading}
+                        >
+                            {!isGoogleLoading && (
+                                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                                </svg>
+                            )}
+                            Google
+                        </Button>
+                    </Card>
+                </div>
+            );
+        };
+
+        // === APLICAÇÃO PRINCIPAL ===
+        const MainApp = () => {
+            const { logout, user } = useContext(AuthContext);
+            const [view, setView] = useState('dashboard');
+            
+            // Estados do Banco de Dados
+            const [licenses, setLicenses] = useState([]);
+            const [movements, setMovements] = useState([]);
+            const [isLoadingData, setIsLoadingData] = useState(true);
+
+            // Modal Estados
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [modalType, setModalType] = useState('');
+            const [formData, setFormData] = useState({});
+            const [isSaving, setIsSaving] = useState(false);
+
+            // Carregar dados do Firebase Firestore
+            useEffect(() => {
+                const unsubLic = db.collection("licenses").onSnapshot(snap => {
+                    setLicenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, err => console.log("Erro de permissão nas Licenças", err));
+
+                const unsubMov = db.collection("movements").orderBy("date", "desc").onSnapshot(snap => {
+                    setMovements(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    setIsLoadingData(false);
+                }, err => { console.log("Erro Movimentações", err); setIsLoadingData(false); });
+
+                return () => { unsubLic(); unsubMov(); };
+            }, []);
+
+            // Salvar no Banco
+            const handleSave = async () => {
+                setIsSaving(true);
+                try {
+                    if (modalType === 'license') {
+                        await db.collection("licenses").add({
+                            ...formData,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        await db.collection("movements").add({
+                            ...formData,
+                            date: new Date().toISOString(),
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    setIsModalOpen(false);
+                } catch (e) {
+                    alert("Erro ao salvar! Verifique as regras do Firestore.");
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            const openModal = (type) => {
+                setModalType(type);
+                setFormData(type === 'license' 
+                    ? { name: '', number: '', agency: '', expireDate: '', alertDays: 30 }
+                    : { client: '', action: 'SAIDA', type: '', quantity: 1 }
+                );
+                setIsModalOpen(true);
+            };
+
+            // Inteligência das Licenças
+            const processedLicenses = licenses.map(lic => {
+                if(!lic.expireDate) return { ...lic, diasRestantes: 0, badgeType: 'default', statusTxt: 'N/A' };
+                const diff = Math.ceil((new Date(lic.expireDate) - new Date()) / (1000 * 60 * 60 * 24));
+                let badgeType = 'success', statusTxt = 'Regular';
+                if (diff < 0) { badgeType = 'danger'; statusTxt = 'Vencida'; }
+                else if (diff <= lic.alertDays) { badgeType = 'warning'; statusTxt = 'Vencendo'; }
+                return { ...lic, diasRestantes: diff, badgeType, statusTxt };
+            });
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* Fundo Glow */}
+                    <div className="fixed inset-0 pointer-events-none z-0">
+                        <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-900/10 blur-[150px]"></div>
+                        <div className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-cyan-900/10 blur-[150px]"></div>
+                    </div>
+
+                    {/* Sidebar */}
+                    <aside className="w-64 bg-[#0a0b10] border-r border-white/5 flex flex-col z-10 shadow-2xl">
+                        <div className="p-6">
+                            <div className="flex items-center gap-3 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">
+                                <Icon name="FlaskConical" size={28} className="text-purple-500" />
+                                <h1 className="text-2xl font-black tracking-tighter uppercase">NovaChem</h1>
+                            </div>
+                        </div>
+                        <nav className="flex-1 px-4 space-y-2 mt-4">
+                            <button onClick={()=>setView('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='dashboard'?'bg-white/10 text-white shadow-[inset_2px_0_0_#fff]':'text-slate-400 hover:bg-white/5'}`}><Icon name="LayoutDashboard"/> Dashboard</button>
+                            <button onClick={()=>setView('licenses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='licenses'?'bg-purple-500/10 text-purple-400 shadow-[inset_2px_0_0_#a855f7]':'text-slate-400 hover:bg-white/5'}`}><Icon name="ShieldAlert"/> Licenças</button>
+                            <button onClick={()=>setView('containers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='containers'?'bg-cyan-500/10 text-cyan-400 shadow-[inset_2px_0_0_#06b6d4]':'text-slate-400 hover:bg-white/5'}`}><Icon name="Activity"/> Logística</button>
+                        </nav>
+                        <div className="p-4 border-t border-white/5">
+                            <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-rose-400"><Icon name="LogOut"/> Sair</button>
+                        </div>
+                    </aside>
+
+                    {/* Conteúdo Central */}
+                    <main className="flex-1 flex flex-col z-10">
+                        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-[#0a0b10]/60 backdrop-blur-xl">
+                            <h2 className="text-xl font-bold uppercase tracking-wide text-slate-300">
+                                {view === 'dashboard' ? 'Painel Central' : view === 'licenses' ? 'Gestão de Licenças' : 'Controle Logístico'}
+                            </h2>
+                            <div className="flex items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-sm font-medium text-white">{user?.displayName || user?.email || 'Usuário'}</p>
+                                    <p className="text-[10px] text-emerald-400 uppercase flex items-center justify-end gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Online no Firebase</p>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            
+                            {/* DASHBOARD */}
+                            {view === 'dashboard' && (
+                                <div className="grid grid-cols-2 gap-6 max-w-4xl mx-auto mt-10">
+                                    <Card className="p-8 text-center" glowColor="purple">
+                                        <Icon name="ShieldAlert" size={40} className="mx-auto text-purple-500 mb-4" />
+                                        <h3 className="text-5xl font-black text-white mb-2">{licenses.length}</h3>
+                                        <p className="text-slate-400">Licenças Monitoradas</p>
+                                    </Card>
+                                    <Card className="p-8 text-center" glowColor="cyan">
+                                        <Icon name="ArrowRightLeft" size={40} className="mx-auto text-cyan-500 mb-4" />
+                                        <h3 className="text-5xl font-black text-white mb-2">{movements.length}</h3>
+                                        <p className="text-slate-400">Movimentações Registradas</p>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* LICENÇAS */}
+                            {view === 'licenses' && (
+                                <div>
+                                    <div className="flex justify-end mb-6">
+                                        <Button onClick={()=>openModal('license')}><Icon name="Plus" className="mr-2"/> Nova Licença</Button>
+                                    </div>
+                                    <Card className="p-0 overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-white/5 border-b border-white/10 text-xs uppercase text-slate-400">
+                                                <tr><th className="p-4">Documento</th><th className="p-4">Órgão</th><th className="p-4">Vencimento</th><th className="p-4">Status</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5">
+                                                {processedLicenses.map(lic => (
+                                                    <tr key={lic.id} className="hover:bg-white/[0.02]">
+                                                        <td className="p-4 font-bold text-white">{lic.name} <p className="text-xs text-slate-500 font-normal">{lic.number}</p></td>
+                                                        <td className="p-4 text-slate-300">{lic.agency}</td>
+                                                        <td className="p-4 text-slate-300">{lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                                                        <td className="p-4"><NeonBadge type={lic.badgeType} text={lic.statusTxt}/></td>
+                                                    </tr>
+                                                ))}
+                                                {processedLicenses.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-slate-500">Nenhuma licença cadastrada.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* VASILHAMES */}
+                            {view === 'containers' && (
+                                <div>
+                                    <div className="flex justify-end mb-6">
+                                        <Button variant="cyan" onClick={()=>openModal('movement')}><Icon name="ArrowRightLeft" className="mr-2"/> Registrar Movimentação</Button>
+                                    </div>
+                                    <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-white/10">
+                                        {movements.map(mov => (
+                                            <div key={mov.id} className="relative flex items-center justify-between group pl-12">
+                                                <div className={`absolute left-[13px] w-5 h-5 rounded-full border-2 border-[#050508] z-10 ${mov.action==='SAIDA'?'bg-cyan-500':mov.action==='RETORNO'?'bg-purple-500':'bg-rose-500'}`}></div>
+                                                <Card className="w-full p-4 flex justify-between items-center bg-[#0a0b10]">
+                                                    <div>
+                                                        <NeonBadge type={mov.action==='SAIDA'?'cyan':mov.action==='RETORNO'?'default':'danger'} text={mov.action} />
+                                                        <h4 className="text-lg font-bold text-white mt-2">{mov.client}</h4>
+                                                        <p className="text-sm text-slate-400">{mov.quantity}x {mov.type}</p>
+                                                    </div>
+                                                    <div className="text-right text-xs text-slate-500">
+                                                        {new Date(mov.date).toLocaleDateString('pt-BR')}
+                                                    </div>
+                                                </Card>
+                                            </div>
+                                        ))}
+                                        {movements.length === 0 && <p className="text-center text-slate-500 pt-8">Nenhuma movimentação registrada.</p>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    {/* MODAIS DE CADASTRO */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <Card className="w-full max-w-md p-6">
+                                <h3 className="text-xl font-bold text-white mb-6">
+                                    {modalType === 'license' ? 'Cadastrar Licença' : 'Registrar Movimentação'}
+                                </h3>
+                                
+                                {modalType === 'license' ? (
+                                    <div className="space-y-4">
+                                        <input type="text" placeholder="Nome do Documento" value={formData.name} onChange={e=>setFormData({...formData, name:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
+                                        <input type="text" placeholder="Número da Licença" value={formData.number} onChange={e=>setFormData({...formData, number:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
+                                        <input type="text" placeholder="Órgão Fiscalizador (Ex: PF)" value={formData.agency} onChange={e=>setFormData({...formData, agency:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
+                                        <div>
+                                            <label className="text-xs text-slate-400 mb-1 block">Data de Vencimento</label>
+                                            <input type="date" value={formData.expireDate} onChange={e=>setFormData({...formData, expireDate:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-purple-500 outline-none" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <select value={formData.action} onChange={e=>setFormData({...formData, action:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none">
+                                            <option value="SAIDA">Saída de Vasilhame</option>
+                                            <option value="RETORNO">Retorno de Vasilhame</option>
+                                            <option value="PERDA">Perda / Dano</option>
+                                        </select>
+                                        <input type="text" placeholder="Nome do Cliente" value={formData.client} onChange={e=>setFormData({...formData, client:e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+                                        <div className="flex gap-4">
+                                            <input type="text" placeholder="Tipo Frasco (Ex: IBC 1000L)" value={formData.type} onChange={e=>setFormData({...formData, type:e.target.value})} className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+                                            <input type="number" placeholder="Qtd" value={formData.quantity} onChange={e=>setFormData({...formData, quantity:Number(e.target.value)})} className="w-24 bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 mt-8">
+                                    <Button variant="secondary" onClick={()=>setIsModalOpen(false)}>Cancelar</Button>
+                                    <Button variant={modalType === 'license' ? 'primary' : 'cyan'} onClick={handleSave} isLoading={isSaving}>
+                                        Salvar no Banco
+                                    </Button>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            <AuthProvider>
+                <AuthContext.Consumer>
+                    {({ uiLoggedIn }) => uiLoggedIn ? <MainApp /> : <LoginScreen />}
+                </AuthContext.Consumer>
+            </AuthProvider>
+        );
+    </script>
+</body>
+</html>
