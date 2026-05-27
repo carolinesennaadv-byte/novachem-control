@@ -74,7 +74,10 @@
             Trash2: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
             XCircle: <><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></>,
             Paperclip: <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>,
-            ExternalLink: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></>
+            ExternalLink: <><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></>,
+            Package: <><path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
+            Beaker: <><path d="M4.5 3h15"/><path d="M6 3v10a6 6 0 0 0 12 0V3"/><path d="M6 14h12"/></>,
+            BarChart3: <><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></>
         };
 
         const Icon = ({ name, size = 18, className = "" }) => (
@@ -325,6 +328,16 @@
             const [selectedFile, setSelectedFile] = useState(null);
             const [uploadProgress, setUploadProgress] = useState(0);
 
+            // Estoque de Frascos — Estado
+            const [bottleStock, setBottleStock] = useState([]);
+            const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+            const [stockModalMode, setStockModalMode] = useState('create');
+            const [stockFormData, setStockFormData] = useState({});
+            const [isSavingStock, setIsSavingStock] = useState(false);
+
+            // E-mail do proprietário: único com permissão de editar/excluir o Estoque de Frascos
+            const OWNER_EMAIL = "novalogis@novalogis.com.br"; // ← altere para o seu e-mail
+
             // Modal Estado ADMIN
             const [showAdminModal, setShowAdminModal] = useState(false);
             const [adminPwdInput, setAdminPwdInput] = useState('');
@@ -335,7 +348,8 @@
                 const unsubLic = db.collection("licenses").onSnapshot(snap => setLicenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
                 const unsubMov = db.collection("movements").orderBy("dateOut", "desc").onSnapshot(snap => setMovements(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
                 const unsubAudit = db.collection("audit_logs").orderBy("timestamp", "desc").limit(50).onSnapshot(snap => setAuditLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-                return () => { unsubLic(); unsubMov(); unsubAudit(); };
+                const unsubStock = db.collection("bottle_stock").orderBy("dateOut", "desc").onSnapshot(snap => setBottleStock(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                return () => { unsubLic(); unsubMov(); unsubAudit(); unsubStock(); };
             }, []);
 
             // FUNÇÃO DESBLOQUEIO DE ADMIN
@@ -381,6 +395,23 @@
             // ESTATÍSTICAS LOGÍSTICA
             const totalRetirada = movements.reduce((acc, curr) => acc + (parseInt(curr.quantityOut) || 0), 0);
             const totalDevolvida = movements.reduce((acc, curr) => acc + (parseInt(curr.quantityIn) || 0), 0);
+
+            // ESTATÍSTICAS ESTOQUE DE FRASCOS
+            const VOLUMES = ['15mL', '100mL', '120mL', '250mL', '500mL', '1000mL'];
+            const MATERIAIS = ['Vidro', 'Plástico'];
+            const stockSummary = VOLUMES.map(vol => {
+                const entries = bottleStock.filter(b => b.volume === vol);
+                return {
+                    volume: vol,
+                    vidroOut: entries.filter(b => b.material === 'Vidro').reduce((a,b) => a + (parseInt(b.quantityOut)||0), 0),
+                    vidroIn:  entries.filter(b => b.material === 'Vidro').reduce((a,b) => a + (parseInt(b.quantityIn)||0), 0),
+                    plasticoOut: entries.filter(b => b.material === 'Plástico').reduce((a,b) => a + (parseInt(b.quantityOut)||0), 0),
+                    plasticoIn:  entries.filter(b => b.material === 'Plástico').reduce((a,b) => a + (parseInt(b.quantityIn)||0), 0),
+                };
+            });
+            const totalFrascosOut = bottleStock.reduce((a,b) => a + (parseInt(b.quantityOut)||0), 0);
+            const totalFrascosIn  = bottleStock.reduce((a,b) => a + (parseInt(b.quantityIn)||0), 0);
+            const isOwner = user?.email === OWNER_EMAIL;
 
             // FUNÇÕES DE EXPORTAÇÃO (PDF / EXCEL)
             const handleExportPDF = (type) => {
@@ -432,6 +463,39 @@
                 const wb = window.XLSX.utils.book_new();
                 window.XLSX.utils.book_append_sheet(wb, ws, "Relatorio");
                 window.XLSX.writeFile(wb, fileName);
+            };
+
+            // EXPORTAÇÃO — ESTOQUE DE FRASCOS
+            const handleExportStockPDF = () => {
+                const doc = new window.jspdf.jsPDF('landscape');
+                doc.text("NovaLogis - Estoque de Frascos", 14, 15);
+                const columns = ["Material", "Volume", "Cliente/Destino", "Qtd Retirada", "Data Retirada", "Qtd Devolvida", "Data Retorno", "Saldo Pendente"];
+                const data = bottleStock.map(b => [
+                    b.material, b.volume, b.client,
+                    b.quantityOut,
+                    b.dateOut ? new Date(b.dateOut).toLocaleDateString('pt-BR') : 'N/A',
+                    b.quantityIn || 0,
+                    b.dateIn ? new Date(b.dateIn).toLocaleDateString('pt-BR') : 'Pendente',
+                    (parseInt(b.quantityOut)||0) - (parseInt(b.quantityIn)||0)
+                ]);
+                doc.autoTable({ head: [columns], body: data, startY: 22, theme: 'grid', styles: { fontSize: 8 } });
+                doc.save("NovaLogis_Estoque_Frascos.pdf");
+            };
+
+            const handleExportStockExcel = () => {
+                const data = bottleStock.map(b => ({
+                    "Material": b.material, "Volume": b.volume, "Cliente/Destino": b.client,
+                    "Qtd Retirada": b.quantityOut,
+                    "Data Retirada": b.dateOut ? new Date(b.dateOut).toLocaleDateString('pt-BR') : 'N/A',
+                    "Qtd Devolvida": b.quantityIn || 0,
+                    "Data Retorno": b.dateIn ? new Date(b.dateIn).toLocaleDateString('pt-BR') : 'N/A',
+                    "Saldo Pendente": (parseInt(b.quantityOut)||0) - (parseInt(b.quantityIn)||0),
+                    "Observações": b.notes || ''
+                }));
+                const ws = window.XLSX.utils.json_to_sheet(data);
+                const wb = window.XLSX.utils.book_new();
+                window.XLSX.utils.book_append_sheet(wb, ws, "Estoque_Frascos");
+                window.XLSX.writeFile(wb, "NovaLogis_Estoque_Frascos.xlsx");
             };
 
             // CRUD HANDLERS
@@ -535,6 +599,49 @@
             const addDocItem = () => setFormData({...formData, docsList: [...(formData.docsList || []), '']});
             const removeDocItem = (index) => setFormData({...formData, docsList: formData.docsList.filter((_, i) => i !== index)});
 
+            // ── ESTOQUE DE FRASCOS — CRUD ──
+            const openStockModal = (mode = 'create', data = null) => {
+                setStockModalMode(mode);
+                if (mode === 'edit' && data) {
+                    setStockFormData(data);
+                } else {
+                    setStockFormData({
+                        material: 'Vidro', volume: '250mL', client: '',
+                        quantityOut: 1, dateOut: new Date().toISOString().split('T')[0],
+                        quantityIn: 0, dateIn: '', notes: ''
+                    });
+                }
+                setIsStockModalOpen(true);
+            };
+
+            const handleStockSave = async () => {
+                if (!isOwner) return alert("Apenas o proprietário pode editar o Estoque de Frascos.");
+                if (!stockFormData.client) return alert("Informe o cliente/destino.");
+                setIsSavingStock(true);
+                try {
+                    if (stockModalMode === 'create') {
+                        await db.collection("bottle_stock").add({ ...stockFormData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        await logAction('estoque', 'CRIOU', `${stockFormData.material} ${stockFormData.volume} — ${stockFormData.client}`, `Saída de ${stockFormData.quantityOut} unid. em ${stockFormData.dateOut}`);
+                    } else {
+                        const { id, ...upd } = stockFormData;
+                        await db.collection("bottle_stock").doc(id).update({ ...upd, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                        await logAction('estoque', 'EDITOU', `${stockFormData.material} ${stockFormData.volume} — ${stockFormData.client}`, `Registro atualizado.`);
+                    }
+                    setIsStockModalOpen(false);
+                } catch(e) { alert("Erro ao salvar: " + e.message); }
+                finally { setIsSavingStock(false); }
+            };
+
+            const handleStockDelete = async (item) => {
+                if (!isOwner) return alert("Apenas o proprietário pode excluir registros do Estoque.");
+                if (window.confirm(`Excluir permanentemente o frasco [${item.material} ${item.volume} — ${item.client}]?`)) {
+                    try {
+                        await db.collection("bottle_stock").doc(item.id).delete();
+                        await logAction('estoque', 'ELIMINOU', `${item.material} ${item.volume} — ${item.client}`, 'Registro excluído.');
+                    } catch(e) { alert("Erro ao excluir."); }
+                }
+            };
+
             return (
                 <div className="flex h-screen overflow-hidden">
                     <div className="fixed inset-0 pointer-events-none z-0">
@@ -554,6 +661,9 @@
                             <button onClick={()=>setView('licenses')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='licenses'?'bg-purple-500/10 text-purple-400 shadow-[inset_2px_0_0_#a855f7]':'text-slate-400 hover:bg-white/5'}`}><Icon name="ShieldAlert"/> Licenças</button>
                             <button onClick={()=>setView('containers')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='containers'?'bg-cyan-500/10 text-cyan-400 shadow-[inset_2px_0_0_#06b6d4]':'text-slate-400 hover:bg-white/5'}`}><Icon name="Activity"/> Logística</button>
                             <button onClick={()=>setView('audit')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='audit'?'bg-rose-500/10 text-rose-400 shadow-[inset_2px_0_0_#f43f5e]':'text-slate-400 hover:bg-white/5'}`}><Icon name="History"/> Histórico (Auditoria)</button>
+                            <div className="my-2 border-t border-white/5"></div>
+                            <p className="text-[9px] text-slate-600 uppercase font-bold px-4 pb-1 tracking-widest">Logística</p>
+                            <button onClick={()=>setView('stock')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${view==='stock'?'bg-emerald-500/10 text-emerald-400 shadow-[inset_2px_0_0_#10b981]':'text-slate-400 hover:bg-white/5'}`}><Icon name="Package"/> Estoque de Frascos</button>
                         </nav>
                         <div className="p-4 border-t border-white/5">
                             <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-rose-400"><Icon name="LogOut"/> Sair</button>
@@ -564,7 +674,7 @@
                     <main className="flex-1 flex flex-col z-10">
                         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-[#0a0b10]/60 backdrop-blur-xl">
                             <h2 className="text-xl font-bold uppercase tracking-wide text-slate-300">
-                                {view === 'dashboard' ? 'Painel Central' : view === 'licenses' ? 'Gestão de Licenças' : view === 'containers' ? 'Controlo Logístico' : 'Rastreabilidade e Logs'}
+                                {view === 'dashboard' ? 'Painel Central' : view === 'licenses' ? 'Gestão de Licenças' : view === 'containers' ? 'Controle Logístico' : view === 'stock' ? 'Estoque de Frascos' : 'Rastreabilidade e Logs'}
                             </h2>
                             <div className="flex items-center gap-4">
                                 
@@ -590,22 +700,46 @@
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                             {/* === DASHBOARD === */}
                             {view === 'dashboard' && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-6">
-                                    <Card className="p-6 text-center" glowColor="purple">
-                                        <Icon name="ShieldAlert" size={32} className="mx-auto text-purple-500 mb-4" />
-                                        <h3 className="text-4xl font-black text-white mb-2">{licenses.length}</h3>
-                                        <p className="text-slate-400 text-sm">Licenças Monitoradas</p>
-                                    </Card>
-                                    <Card className="p-6 text-center" glowColor="cyan">
-                                        <Icon name="ArrowRightLeft" size={32} className="mx-auto text-cyan-500 mb-4" />
-                                        <h3 className="text-4xl font-black text-white mb-2">{totalRetirada}</h3>
-                                        <p className="text-slate-400 text-sm">Itens Retirados</p>
-                                    </Card>
-                                    <Card className="p-6 text-center" glowColor="rose">
-                                        <Icon name="CheckCircle2" size={32} className="mx-auto text-emerald-500 mb-4" />
-                                        <h3 className="text-4xl font-black text-white mb-2">{totalDevolvida}</h3>
-                                        <p className="text-slate-400 text-sm">Itens Devolvidos</p>
-                                        <p className="text-xs text-rose-400 mt-2 font-bold">Saldo pendente: {totalRetirada - totalDevolvida}</p>
+                                <div className="max-w-5xl mx-auto mt-6 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <Card className="p-6 text-center" glowColor="purple">
+                                            <Icon name="ShieldAlert" size={32} className="mx-auto text-purple-500 mb-4" />
+                                            <h3 className="text-4xl font-black text-white mb-2">{licenses.length}</h3>
+                                            <p className="text-slate-400 text-sm">Licenças Monitoradas</p>
+                                        </Card>
+                                        <Card className="p-6 text-center" glowColor="cyan">
+                                            <Icon name="ArrowRightLeft" size={32} className="mx-auto text-cyan-500 mb-4" />
+                                            <h3 className="text-4xl font-black text-white mb-2">{totalRetirada}</h3>
+                                            <p className="text-slate-400 text-sm">Itens Retirados (Logística)</p>
+                                        </Card>
+                                        <Card className="p-6 text-center" glowColor="rose">
+                                            <Icon name="CheckCircle2" size={32} className="mx-auto text-emerald-500 mb-4" />
+                                            <h3 className="text-4xl font-black text-white mb-2">{totalDevolvida}</h3>
+                                            <p className="text-slate-400 text-sm">Itens Devolvidos</p>
+                                            <p className="text-xs text-rose-400 mt-2 font-bold">Saldo pendente: {totalRetirada - totalDevolvida}</p>
+                                        </Card>
+                                    </div>
+                                    <Card className="p-6" glowColor="cyan">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <Icon name="Package" size={22} className="text-emerald-400"/>
+                                            <h3 className="text-sm font-bold text-white uppercase tracking-wide">Estoque de Frascos — Resumo Geral</h3>
+                                        </div>
+                                        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                                            {stockSummary.map(s => (
+                                                <div key={s.volume} className="bg-white/5 rounded-xl p-3 text-center border border-white/10">
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-2">{s.volume}</p>
+                                                    <div className="space-y-1">
+                                                        <p className="text-[10px] text-blue-400">🔵 Vidro</p>
+                                                        <p className="text-xs font-bold text-rose-400">↑ {s.vidroOut}</p>
+                                                        <p className="text-xs font-bold text-emerald-400">↓ {s.vidroIn}</p>
+                                                        <p className="text-[10px] text-yellow-400 mt-2">🟡 Plástico</p>
+                                                        <p className="text-xs font-bold text-rose-400">↑ {s.plasticoOut}</p>
+                                                        <p className="text-xs font-bold text-emerald-400">↓ {s.plasticoIn}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-3 text-right">↑ Retirada &nbsp;·&nbsp; ↓ Devolvida</p>
                                     </Card>
                                 </div>
                             )}
@@ -741,6 +875,131 @@
                                 </div>
                             )}
 
+
+                            {/* === ESTOQUE DE FRASCOS === */}
+                            {view === 'stock' && (
+                                <div>
+                                    {/* Header com ações */}
+                                    <div className="flex flex-wrap justify-between items-center mb-6 gap-3">
+                                        <div className="flex gap-3 flex-wrap">
+                                            <Button variant="red" onClick={handleExportStockPDF}><Icon name="FileText" className="mr-2"/> Baixar PDF</Button>
+                                            <Button variant="green" onClick={handleExportStockExcel}><Icon name="FileSpreadsheet" className="mr-2"/> Baixar EXCEL</Button>
+                                        </div>
+                                        {isOwner && (
+                                            <Button variant="green" onClick={() => openStockModal('create')}>
+                                                <Icon name="Plus" className="mr-2"/> Nova Movimentação
+                                            </Button>
+                                        )}
+                                        {!isOwner && (
+                                            <span className="text-xs text-slate-500 italic flex items-center gap-1"><Icon name="Lock" size={12}/> Somente o proprietário pode editar</span>
+                                        )}
+                                    </div>
+
+                                    {/* Cards de resumo por volume */}
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+                                        {stockSummary.map(s => {
+                                            const saldoVidro = s.vidroOut - s.vidroIn;
+                                            const saldoPlastico = s.plasticoOut - s.plasticoIn;
+                                            return (
+                                                <Card key={s.volume} className="p-4" glowColor={saldoVidro > 0 || saldoPlastico > 0 ? 'rose' : 'none'}>
+                                                    <p className="text-xs font-black text-white text-center mb-3 uppercase tracking-widest">{s.volume}</p>
+                                                    <div className="space-y-2">
+                                                        <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
+                                                            <p className="text-[9px] text-blue-400 uppercase font-bold text-center mb-1">🔵 Vidro</p>
+                                                            <div className="flex justify-between text-[10px]">
+                                                                <span className="text-slate-400">↑ {s.vidroOut}</span>
+                                                                <span className="text-emerald-400">↓ {s.vidroIn}</span>
+                                                            </div>
+                                                            <p className={`text-center text-[10px] font-bold mt-1 ${saldoVidro > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>Saldo: {saldoVidro}</p>
+                                                        </div>
+                                                        <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                                                            <p className="text-[9px] text-yellow-400 uppercase font-bold text-center mb-1">🟡 Plástico</p>
+                                                            <div className="flex justify-between text-[10px]">
+                                                                <span className="text-slate-400">↑ {s.plasticoOut}</span>
+                                                                <span className="text-emerald-400">↓ {s.plasticoIn}</span>
+                                                            </div>
+                                                            <p className={`text-center text-[10px] font-bold mt-1 ${saldoPlastico > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>Saldo: {saldoPlastico}</p>
+                                                        </div>
+                                                    </div>
+                                                </Card>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Totais globais */}
+                                    <div className="grid grid-cols-3 gap-4 mb-6">
+                                        <Card className="p-4 text-center" glowColor="cyan">
+                                            <p className="text-2xl font-black text-white">{totalFrascosOut}</p>
+                                            <p className="text-xs text-slate-400 mt-1">Total Retirado</p>
+                                        </Card>
+                                        <Card className="p-4 text-center" glowColor="cyan">
+                                            <p className="text-2xl font-black text-emerald-400">{totalFrascosIn}</p>
+                                            <p className="text-xs text-slate-400 mt-1">Total Devolvido</p>
+                                        </Card>
+                                        <Card className={`p-4 text-center`} glowColor={totalFrascosOut - totalFrascosIn > 0 ? 'rose' : 'none'}>
+                                            <p className={`text-2xl font-black ${totalFrascosOut - totalFrascosIn > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{totalFrascosOut - totalFrascosIn}</p>
+                                            <p className="text-xs text-slate-400 mt-1">Saldo Pendente Global</p>
+                                        </Card>
+                                    </div>
+
+                                    {/* Tabela de movimentações */}
+                                    <Card className="p-0 overflow-hidden">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-white/5 border-b border-white/10 text-xs uppercase text-slate-400">
+                                                <tr>
+                                                    <th className="p-4">Material / Volume</th>
+                                                    <th className="p-4">Cliente / Destino</th>
+                                                    <th className="p-4">Retirada</th>
+                                                    <th className="p-4">Retorno</th>
+                                                    <th className="p-4">Saldo</th>
+                                                    <th className="p-4">Status</th>
+                                                    {isOwner && <th className="p-4 text-right">Ações</th>}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5">
+                                                {bottleStock.map(item => {
+                                                    const saldo = (parseInt(item.quantityOut)||0) - (parseInt(item.quantityIn)||0);
+                                                    const status = saldo <= 0 ? 'DEVOLVIDO' : 'PENDENTE';
+                                                    return (
+                                                        <tr key={item.id} className="hover:bg-white/[0.02]">
+                                                            <td className="p-4">
+                                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold border mr-2 ${item.material === 'Vidro' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'}`}>
+                                                                    {item.material === 'Vidro' ? '🔵' : '🟡'} {item.material}
+                                                                </span>
+                                                                <p className="text-white font-bold mt-1">{item.volume}</p>
+                                                            </td>
+                                                            <td className="p-4 text-slate-300 text-sm">{item.client}</td>
+                                                            <td className="p-4">
+                                                                <p className="text-sm font-bold text-rose-400">{item.quantityOut} un.</p>
+                                                                <p className="text-xs text-slate-500">{item.dateOut ? new Date(item.dateOut).toLocaleDateString('pt-BR') : '—'}</p>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <p className="text-sm font-bold text-emerald-400">{item.quantityIn || 0} un.</p>
+                                                                <p className="text-xs text-slate-500">{item.dateIn ? new Date(item.dateIn).toLocaleDateString('pt-BR') : 'Pendente'}</p>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className={`text-sm font-black ${saldo > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{saldo}</span>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <NeonBadge type={status === 'DEVOLVIDO' ? 'success' : 'warning'} text={status}/>
+                                                            </td>
+                                                            {isOwner && (
+                                                                <td className="p-4 text-right whitespace-nowrap">
+                                                                    <button onClick={() => openStockModal('edit', item)} className="text-cyan-400 hover:text-cyan-300 p-2"><Icon name="Edit2" size={16}/></button>
+                                                                    <button onClick={() => handleStockDelete(item)} className="text-rose-400 hover:text-rose-300 p-2"><Icon name="Trash2" size={16}/></button>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {bottleStock.length === 0 && (
+                                                    <tr><td colSpan={isOwner ? 7 : 6} className="p-8 text-center text-slate-500">Nenhuma movimentação de frascos registrada.</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </Card>
+                                </div>
+                            )}
                         </div>
                     </main>
 
@@ -869,6 +1128,105 @@
                             </Card>
                         </div>
                     )}
+                    {/* === MODAL ESTOQUE DE FRASCOS === */}
+                    {isStockModalOpen && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+                            <Card className="w-full max-w-lg p-6 my-8 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                    <Icon name="Package" size={20} className="text-emerald-400"/>
+                                    {stockModalMode === 'create' ? 'Nova Movimentação de Frasco' : 'Editar Movimentação'}
+                                </h3>
+
+                                <div className="space-y-4">
+                                    {/* Material + Volume */}
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">Material</label>
+                                            <select value={stockFormData.material} onChange={e => setStockFormData({...stockFormData, material: e.target.value})}
+                                                className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-emerald-500 outline-none">
+                                                <option value="Vidro">🔵 Vidro</option>
+                                                <option value="Plástico">🟡 Plástico</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">Volume</label>
+                                            <select value={stockFormData.volume} onChange={e => setStockFormData({...stockFormData, volume: e.target.value})}
+                                                className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-emerald-500 outline-none">
+                                                <option value="15mL">15 mL</option>
+                                                <option value="100mL">100 mL</option>
+                                                <option value="120mL">120 mL</option>
+                                                <option value="250mL">250 mL</option>
+                                                <option value="500mL">500 mL</option>
+                                                <option value="1000mL">1000 mL</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Cliente */}
+                                    <div>
+                                        <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">Cliente / Destino</label>
+                                        <input type="text" placeholder="Nome do cliente ou destino"
+                                            value={stockFormData.client} onChange={e => setStockFormData({...stockFormData, client: e.target.value})}
+                                            className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                    </div>
+
+                                    {/* Retirada */}
+                                    <div className="p-3 border border-rose-500/20 rounded-lg bg-rose-500/5">
+                                        <label className="text-xs text-rose-400 mb-2 block font-bold uppercase">Dados de Retirada</label>
+                                        <div className="flex gap-4">
+                                            <div className="w-1/3">
+                                                <label className="text-[10px] text-slate-400 mb-1 block">Qtd Retirada</label>
+                                                <input type="number" min="0" value={stockFormData.quantityOut}
+                                                    onChange={e => setStockFormData({...stockFormData, quantityOut: Number(e.target.value)})}
+                                                    className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-sm text-white outline-none" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-slate-400 mb-1 block">Data de Retirada</label>
+                                                <input type="date" value={stockFormData.dateOut}
+                                                    onChange={e => setStockFormData({...stockFormData, dateOut: e.target.value})}
+                                                    className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-sm text-white outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Retorno */}
+                                    <div className="p-3 border border-emerald-500/20 rounded-lg bg-emerald-500/5">
+                                        <label className="text-xs text-emerald-400 mb-2 block font-bold uppercase">Dados de Retorno (Devolução)</label>
+                                        <div className="flex gap-4">
+                                            <div className="w-1/3">
+                                                <label className="text-[10px] text-slate-400 mb-1 block">Qtd Devolvida</label>
+                                                <input type="number" min="0" value={stockFormData.quantityIn || 0}
+                                                    onChange={e => setStockFormData({...stockFormData, quantityIn: Number(e.target.value)})}
+                                                    className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-sm text-white outline-none" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] text-slate-400 mb-1 block">Data de Retorno</label>
+                                                <input type="date" value={stockFormData.dateIn || ''}
+                                                    onChange={e => setStockFormData({...stockFormData, dateIn: e.target.value})}
+                                                    className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-sm text-white outline-none" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Observações */}
+                                    <div>
+                                        <label className="text-[10px] text-slate-400 mb-1 block uppercase font-bold">Observações (opcional)</label>
+                                        <input type="text" placeholder="Ex: Lote de análise interna, frasco danificado..."
+                                            value={stockFormData.notes || ''} onChange={e => setStockFormData({...stockFormData, notes: e.target.value})}
+                                            className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-3 mt-8">
+                                    <Button variant="secondary" onClick={() => setIsStockModalOpen(false)}>Cancelar</Button>
+                                    <Button variant="green" onClick={handleStockSave} isLoading={isSavingStock}>
+                                        {stockModalMode === 'create' ? 'Salvar' : 'Atualizar'}
+                                    </Button>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
                 </div>
             );
         };
