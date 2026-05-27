@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -108,7 +108,7 @@
             useEffect(() => {
                 const timeout = setTimeout(() => {
                     if (isInitializing) {
-                        setAuthError("Tempo de ligação esgotado. Verifique a internet ou bloqueios do navegador.");
+                        setAuthError("Tempo de conexão esgotado. Verifique a internet ou bloqueios do navegador.");
                         setIsInitializing(false);
                     }
                 }, 4000);
@@ -150,7 +150,7 @@
             if (isInitializing) return (
                 <div className="min-h-screen bg-[#050508] flex flex-col items-center justify-center">
                     <Icon name="Loader2" size={48} className="text-cyan-500 animate-spin mb-6" />
-                    <h1 className="text-2xl font-black text-white tracking-tighter uppercase animate-pulse">A Iniciar NovaLogis...</h1>
+                    <h1 className="text-2xl font-black text-white tracking-tighter uppercase animate-pulse">Iniciando NovaLogis...</h1>
                 </div>
             );
 
@@ -215,16 +215,16 @@
                 e.preventDefault(); setIsLoading(true); setError('');
                 try { 
                     if (isRegistering) {
-                        if (password !== confirmPassword) { setError('As palavras-passe não coincidem.'); setIsLoading(false); return; }
+                        if (password !== confirmPassword) { setError('As senhas não coincidem.'); setIsLoading(false); return; }
                         await register(email, password);
                     } else {
                         await login(email, password); 
                     }
                 } 
                 catch (err) { 
-                    if (err.code === 'auth/email-already-in-use') setError('Este email já está registado.');
-                    else if (err.code === 'auth/weak-password') setError('A palavra-passe deve ter pelo menos 6 caracteres.');
-                    else if (err.code === 'auth/operation-not-allowed') setError('O registo por Email/Palavra-passe não está ativado no Firebase.');
+                    if (err.code === 'auth/email-already-in-use') setError('Este email já está registrado.');
+                    else if (err.code === 'auth/weak-password') setError('A senha deve ter pelo menos 6 caracteres.');
+                    else if (err.code === 'auth/operation-not-allowed') setError('O cadastro por Email/Senha não está ativado no Firebase.');
                     else setError(isRegistering ? `Erro ao criar conta: ${err.message}` : `Acesso negado: Verifique os seus dados.`); 
                 } 
                 finally { setIsLoading(false); }
@@ -257,7 +257,7 @@
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Palavra-passe</label>
+                                <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Senha</label>
                                 <div className="relative">
                                     <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
                                     <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required minLength="6" />
@@ -265,7 +265,7 @@
                             </div>
                             {isRegistering && (
                                 <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Confirmar Palavra-passe</label>
+                                    <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase">Confirmar Senha</label>
                                     <div className="relative">
                                         <Icon name="Lock" size={18} className="absolute left-3 top-3 text-slate-500" />
                                         <input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} className="w-full bg-[#0a0b10] border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-cyan-500 text-white" required minLength="6" />
@@ -346,7 +346,7 @@
                     setAdminPwdInput('');
                     setAdminError('');
                 } else {
-                    setAdminError('Palavra-passe mestra incorreta.');
+                    setAdminError('Senha mestra incorreta.');
                 }
             };
 
@@ -375,7 +375,7 @@
                 if (diffVencimento < 0) { badgeType = 'danger'; statusTxt = 'Vencida'; }
                 else if (diffLimite <= 0) { badgeType = 'warning'; statusTxt = 'Atenção (Processo)'; }
                 
-                return { ...lic, diasRestantes: diffVencimento, limitDateTxt: limitDate.toLocaleDateString('pt-PT'), badgeType, statusTxt };
+                return { ...lic, diasRestantes: diffVencimento, limitDateTxt: limitDate.toLocaleDateString('pt-BR'), badgeType, statusTxt };
             });
 
             // ESTATÍSTICAS LOGÍSTICA
@@ -390,7 +390,7 @@
                     const columns = ["Documento", "Órgão", "Vencimento", "Data Início Proc.", "Status"];
                     const data = processedLicenses.map(lic => [
                         lic.name, lic.agency, 
-                        lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-PT') : 'N/A', 
+                        lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A', 
                         lic.limitDateTxt, lic.statusTxt
                     ]);
                     doc.autoTable({ head: [columns], body: data, startY: 20, theme: 'grid' });
@@ -400,8 +400,8 @@
                     const columns = ["Cliente", "Tipo", "Retirada (Qtd/Data)", "Devolução (Qtd/Data)", "Saldo Pendente"];
                     const data = movements.map(mov => [
                         mov.client, mov.type, 
-                        `${mov.quantityOut} un. em ${new Date(mov.dateOut).toLocaleDateString('pt-PT')}`, 
-                        mov.quantityIn ? `${mov.quantityIn} un. em ${new Date(mov.dateIn).toLocaleDateString('pt-PT')}` : 'Pendente',
+                        `${mov.quantityOut} un. em ${new Date(mov.dateOut).toLocaleDateString('pt-BR')}`, 
+                        mov.quantityIn ? `${mov.quantityIn} un. em ${new Date(mov.dateIn).toLocaleDateString('pt-BR')}` : 'Pendente',
                         (mov.quantityOut - (mov.quantityIn || 0)).toString()
                     ]);
                     doc.autoTable({ head: [columns], body: data, startY: 20, theme: 'grid' });
@@ -416,15 +416,15 @@
                     fileName = "NovaLogis_Licencas.xlsx";
                     data = processedLicenses.map(lic => ({
                         "Documento": lic.name, "Número": lic.number, "Órgão": lic.agency,
-                        "Vencimento": lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-PT') : 'N/A',
+                        "Vencimento": lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A',
                         "Dias Antecedência Exigidos": lic.renewalDays, "Data Limite Início Processo": lic.limitDateTxt, "Status": lic.statusTxt
                     }));
                 } else {
                     fileName = "NovaLogis_Logistica.xlsx";
                     data = movements.map(mov => ({
                         "Cliente": mov.client, "Tipo do Item": mov.type,
-                        "Qtd Retirada": mov.quantityOut, "Data Retirada": new Date(mov.dateOut).toLocaleDateString('pt-PT'),
-                        "Qtd Devolvida": mov.quantityIn || 0, "Data Retorno": mov.dateIn ? new Date(mov.dateIn).toLocaleDateString('pt-PT') : 'N/A',
+                        "Qtd Retirada": mov.quantityOut, "Data Retirada": new Date(mov.dateOut).toLocaleDateString('pt-BR'),
+                        "Qtd Devolvida": mov.quantityIn || 0, "Data Retorno": mov.dateIn ? new Date(mov.dateIn).toLocaleDateString('pt-BR') : 'N/A',
                         "Saldo Pendente": mov.quantityOut - (mov.quantityIn || 0)
                     }));
                 }
@@ -481,11 +481,11 @@
                                     currentFileName = selectedFile.name;
                                     resolve();
                                 } else {
-                                    reject(new Error('Erro no envio do ficheiro.'));
+                                    reject(new Error('Erro no envio do arquivo.'));
                                 }
                             };
                             
-                            xhr.onerror = () => reject(new Error('Erro de rede no upload.'));
+                            xhr.onerror = () => reject(new Error('Erro de rede no envio.'));
                             xhr.send(fd);
                         });
                     }
@@ -501,30 +501,30 @@
 
                     if (modalMode === 'create') {
                         await db.collection(collection).add({ ...finalData, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                        await logAction(modalType, 'CRIOU', docName, `Novo registo adicionado.`);
+                        await logAction(modalType, 'CRIOU', docName, `Novo registro adicionado.`);
                     } else {
                         const { id, ...updateData } = finalData;
                         await db.collection(collection).doc(id).update({ ...updateData, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                        await logAction(modalType, 'EDITOU', docName, `Registo modificado.`);
+                        await logAction(modalType, 'EDITOU', docName, `Registro modificado.`);
                     }
                     setIsModalOpen(false);
                     setSelectedFile(null);
                     setUploadProgress(0);
                 } catch (e) { 
                     console.error(e);
-                    alert("Erro ao guardar! " + e.message); 
+                    alert("Erro ao salvar! " + e.message); 
                 } 
                 finally { setIsSaving(false); }
             };
 
             const handleDelete = async (type, id, name) => {
-                if(!isAdmin) return alert("Apenas administradores podem eliminar.");
-                if(window.confirm(`Tem a certeza que deseja eliminar permanentemente [${name}]? Esta ação não pode ser desfeita.`)) {
+                if(!isAdmin) return alert("Apenas administradores podem excluir.");
+                if(window.confirm(`Tem certeza que deseja excluir permanentemente [${name}]? Esta ação não pode ser desfeita.`)) {
                     try {
                         const collection = type === 'license' ? 'licenses' : 'movements';
                         await db.collection(collection).doc(id).delete();
-                        await logAction(type, 'ELIMINOU', name, `Registo apagado permanentemente.`);
-                    } catch(e) { alert("Erro ao eliminar."); }
+                        await logAction(type, 'ELIMINOU', name, `Registro excluído permanentemente.`);
+                    } catch(e) { alert("Erro ao excluir."); }
                 }
             };
 
@@ -615,8 +615,8 @@
                                 <div>
                                     <div className="flex justify-between items-center mb-6">
                                         <div className="flex gap-3">
-                                            <Button variant="red" onClick={() => handleExportPDF('licenses')}><Icon name="FileText" className="mr-2"/> Descarregar PDF</Button>
-                                            <Button variant="green" onClick={() => handleExportExcel('licenses')}><Icon name="FileSpreadsheet" className="mr-2"/> Descarregar EXCEL</Button>
+                                            <Button variant="red" onClick={() => handleExportPDF('licenses')}><Icon name="FileText" className="mr-2"/> Baixar PDF</Button>
+                                            <Button variant="green" onClick={() => handleExportExcel('licenses')}><Icon name="FileSpreadsheet" className="mr-2"/> Baixar EXCEL</Button>
                                         </div>
                                         {isAdmin && <Button onClick={()=>openModal('license', 'create')}><Icon name="Plus" className="mr-2"/> Nova Licença</Button>}
                                     </div>
@@ -644,7 +644,7 @@
                                                             )}
                                                         </td>
                                                         <td className="p-4 text-slate-300 text-sm">{lic.agency}</td>
-                                                        <td className="p-4 text-slate-300 text-sm">{lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-PT') : 'N/A'}</td>
+                                                        <td className="p-4 text-slate-300 text-sm">{lic.expireDate ? new Date(lic.expireDate).toLocaleDateString('pt-BR') : 'N/A'}</td>
                                                         <td className="p-4 font-bold text-amber-400 text-sm">{lic.limitDateTxt} <span className="text-[10px] text-slate-500 font-normal block">({lic.renewalDays} dias antes)</span></td>
                                                         <td className="p-4"><NeonBadge type={lic.badgeType} text={lic.statusTxt}/></td>
                                                         {isAdmin && (
@@ -655,7 +655,7 @@
                                                         )}
                                                     </tr>
                                                 ))}
-                                                {processedLicenses.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-slate-500">Nenhuma licença registada.</td></tr>}
+                                                {processedLicenses.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-slate-500">Nenhuma licença registrada.</td></tr>}
                                             </tbody>
                                         </table>
                                     </Card>
@@ -667,8 +667,8 @@
                                 <div>
                                     <div className="flex justify-between items-center mb-6">
                                         <div className="flex gap-3">
-                                            <Button variant="red" onClick={() => handleExportPDF('containers')}><Icon name="FileText" className="mr-2"/> Descarregar PDF</Button>
-                                            <Button variant="green" onClick={() => handleExportExcel('containers')}><Icon name="FileSpreadsheet" className="mr-2"/> Descarregar EXCEL</Button>
+                                            <Button variant="red" onClick={() => handleExportPDF('containers')}><Icon name="FileText" className="mr-2"/> Baixar PDF</Button>
+                                            <Button variant="green" onClick={() => handleExportExcel('containers')}><Icon name="FileSpreadsheet" className="mr-2"/> Baixar EXCEL</Button>
                                         </div>
                                         {isAdmin && <Button variant="cyan" onClick={()=>openModal('movement', 'create')}><Icon name="ArrowRightLeft" className="mr-2"/> Criar Lote de Saída</Button>}
                                     </div>
@@ -687,11 +687,11 @@
                                                         <div className="flex gap-6 mt-3 text-sm">
                                                             <div>
                                                                 <p className="text-xs text-slate-500 uppercase">Retirada</p>
-                                                                <p className="font-bold text-cyan-400">{mov.quantityOut} unid. <span className="font-normal text-slate-400 text-xs ml-1">({mov.dateOut ? new Date(mov.dateOut).toLocaleDateString('pt-PT') : ''})</span></p>
+                                                                <p className="font-bold text-cyan-400">{mov.quantityOut} unid. <span className="font-normal text-slate-400 text-xs ml-1">({mov.dateOut ? new Date(mov.dateOut).toLocaleDateString('pt-BR') : ''})</span></p>
                                                             </div>
                                                             <div>
                                                                 <p className="text-xs text-slate-500 uppercase">Retorno</p>
-                                                                <p className="font-bold text-purple-400">{mov.quantityIn || 0} unid. <span className="font-normal text-slate-400 text-xs ml-1">({mov.dateIn ? new Date(mov.dateIn).toLocaleDateString('pt-PT') : 'Pendente'})</span></p>
+                                                                <p className="font-bold text-purple-400">{mov.quantityIn || 0} unid. <span className="font-normal text-slate-400 text-xs ml-1">({mov.dateIn ? new Date(mov.dateIn).toLocaleDateString('pt-BR') : 'Pendente'})</span></p>
                                                             </div>
                                                             <div>
                                                                 <p className="text-xs text-slate-500 uppercase">Saldo Pendente</p>
@@ -702,13 +702,13 @@
                                                     {isAdmin && (
                                                         <div className="flex flex-col gap-2 mt-4 md:mt-0 ml-4 border-l border-white/10 pl-4">
                                                             <Button variant="secondary" className="text-xs py-1 px-3" onClick={()=>openModal('movement', 'edit', mov)}><Icon name="Edit2" size={14} className="mr-1"/> Atualizar Lote</Button>
-                                                            <Button variant="ghost" className="text-xs text-rose-400 hover:text-rose-300 py-1 px-3" onClick={()=>handleDelete('movement', mov.id, mov.client)}><Icon name="Trash2" size={14} className="mr-1"/> Eliminar</Button>
+                                                            <Button variant="ghost" className="text-xs text-rose-400 hover:text-rose-300 py-1 px-3" onClick={()=>handleDelete('movement', mov.id, mov.client)}><Icon name="Trash2" size={14} className="mr-1"/> Excluir</Button>
                                                         </div>
                                                     )}
                                                 </Card>
                                             );
                                         })}
-                                        {movements.length === 0 && <p className="text-center text-slate-500 pt-8">Nenhum lote registado.</p>}
+                                        {movements.length === 0 && <p className="text-center text-slate-500 pt-8">Nenhum lote registrado.</p>}
                                     </div>
                                 </div>
                             )}
@@ -731,12 +731,12 @@
                                                         <p className="text-xs text-slate-400 mt-1">Por: <span className="text-cyan-400">{log.user}</span> • {log.details}</p>
                                                     </div>
                                                     <div className="text-right text-xs text-slate-500">
-                                                        {new Date(log.timestamp).toLocaleString('pt-PT')}
+                                                        {new Date(log.timestamp).toLocaleString('pt-BR')}
                                                     </div>
                                                 </Card>
                                             </div>
                                         ))}
-                                        {auditLogs.length === 0 && <p className="text-center text-slate-500 pt-8 pl-10">Nenhum registo de auditoria encontrado.</p>}
+                                        {auditLogs.length === 0 && <p className="text-center text-slate-500 pt-8 pl-10">Nenhum registro de auditoria encontrado.</p>}
                                     </div>
                                 </div>
                             )}
@@ -753,16 +753,16 @@
                                         <Icon name="Lock" size={24} className="text-cyan-400" />
                                     </div>
                                     <h3 className="text-lg font-bold text-white">Desbloquear Edição</h3>
-                                    <p className="text-xs text-slate-400 mt-1">Insira a palavra-passe mestra para habilitar alterações no sistema.</p>
+                                    <p className="text-xs text-slate-400 mt-1">Digite a senha mestra para habilitar alterações no sistema.</p>
                                 </div>
                                 
                                 {adminError && <div className="bg-rose-500/10 text-rose-400 text-xs p-2 rounded mb-4 text-center">{adminError}</div>}
 
                                 <form onSubmit={handleUnlockAdmin}>
-                                    <input type="password" placeholder="Palavra-passe Mestra" value={adminPwdInput} onChange={e=>setAdminPwdInput(e.target.value)} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-center text-white focus:border-cyan-500 outline-none tracking-widest mb-4" required />
+                                    <input type="password" placeholder="Senha Mestra" value={adminPwdInput} onChange={e=>setAdminPwdInput(e.target.value)} className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-center text-white focus:border-cyan-500 outline-none tracking-widest mb-4" required />
                                     <div className="flex gap-2">
                                         <Button variant="secondary" className="flex-1" onClick={() => {setShowAdminModal(false); setAdminError('');}}>Cancelar</Button>
-                                        <Button variant="cyan" type="submit" className="flex-1">Aceder</Button>
+                                        <Button variant="cyan" type="submit" className="flex-1">Entrar</Button>
                                     </div>
                                 </form>
                             </Card>
@@ -774,7 +774,7 @@
                         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
                             <Card className="w-full max-w-md p-6 my-8">
                                 <h3 className="text-xl font-bold text-white mb-6">
-                                    {modalMode === 'create' ? 'Novo Registo:' : 'Editar Registo:'} {modalType === 'license' ? 'Licença' : 'Lote Logístico'}
+                                    {modalMode === 'create' ? 'Novo Registro:' : 'Editar Registro:'} {modalType === 'license' ? 'Licença' : 'Lote Logístico'}
                                 </h3>
                                 
                                 {modalType === 'license' ? (
@@ -801,7 +801,7 @@
                                             
                                             {formData.fileUrl && !selectedFile && (
                                                 <div className="mt-2 text-xs text-emerald-400 flex items-center">
-                                                    <Icon name="CheckCircle2" size={14} className="mr-1"/> Ficheiro anexado: {formData.fileName}
+                                                    <Icon name="CheckCircle2" size={14} className="mr-1"/> Arquivo anexado: {formData.fileName}
                                                 </div>
                                             )}
                                             
@@ -863,7 +863,7 @@
                                 <div className="flex justify-end gap-3 mt-8">
                                     <Button variant="secondary" onClick={()=>setIsModalOpen(false)}>Cancelar</Button>
                                     <Button variant={modalType === 'license' ? 'primary' : 'cyan'} onClick={handleSave} isLoading={isSaving}>
-                                        {modalMode === 'create' ? 'Guardar Novo' : 'Atualizar'}
+                                        {modalMode === 'create' ? 'Salvar' : 'Atualizar'}
                                     </Button>
                                 </div>
                             </Card>
